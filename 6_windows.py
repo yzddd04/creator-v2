@@ -282,7 +282,6 @@ async def main_loop():
         'tiktok': "https://tokcounter.com/id?user={username}"
     }
     async with async_playwright() as p:
-        # Buka browser & context SEKALI SAJA
         browser = await p.chromium.launch(headless=True, args=[
             '--no-sandbox',
             '--disable-dev-shm-usage',
@@ -290,6 +289,19 @@ async def main_loop():
             '--mute-audio',
             '--disable-infobars',
             '--disable-notifications',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-extensions',
+            '--disable-sync',
+            '--disable-breakpad',
+            '--disable-client-side-phishing-detection',
+            '--disable-default-apps',
+            '--no-first-run',
+            '--disable-popup-blocking',
+            '--disable-hang-monitor',
         ])
         context = await browser.new_context(user_agent='Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36')
         try:
@@ -310,6 +322,9 @@ async def main_loop():
                 stats_data = []
                 try:
                     for user_info in users_to_monitor:
+                        if not browser.is_connected():
+                            print(f"[ERROR] Browser closed, break loop and restart browser/context next cycle.")
+                            break
                         print("-" * 50)
                         print(f"\n[USER] Mulai proses untuk {user_info['username']} ({user_info['platform']}) pada {datetime.now().strftime('%H:%M:%S')}")
                         user_start = time.time()
@@ -319,6 +334,9 @@ async def main_loop():
                         while retry_count < 3:
                             page = None
                             try:
+                                if not browser.is_connected():
+                                    print(f"[ERROR] Browser closed, break user loop.")
+                                    break
                                 print(f"[BROWSER] Membuka tab untuk {user_info['username']} ({user_info['platform']})... URL: {url}")
                                 page = await context.new_page()
                                 await page.route("**/*", block_resource)
@@ -326,6 +344,9 @@ async def main_loop():
                                 goto_attempt = 0
                                 while not goto_success and goto_attempt < max_goto_retries:
                                     try:
+                                        if not browser.is_connected():
+                                            print(f"[ERROR] Browser closed, break goto loop.")
+                                            break
                                         await page.goto(url, timeout=60000)
                                         goto_success = True
                                     except Exception as e:
@@ -428,32 +449,27 @@ async def main_loop():
                     total_fail += 1
                     break
                 finally:
-                    await context.clear_cookies()
-                # --- Tidak perlu tutup browser/context di setiap siklus ---
-                print("-" * 60)
-                chrome_ram = get_chrome_memory_usage()
-                python_ram = get_python_memory_usage()
-                print(f"{YELLOW}[INFO] RAM Chrome: {chrome_ram} MB, RAM Python: {python_ram} MB, File kode = {get_code_file_size()} KB{RESET}")
-                siklus_time = time.time() - siklus_start
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sukses: {total_success} | Gagal: {total_fail} | Total: {len(users_to_monitor)} user | Lama siklus: {siklus_time:.2f} detik")
-                stats_collection.insert_one({
-                    'timestamp': datetime.now(timezone.utc),
-                    'data': stats_data
-                })
-                print(f"{YELLOW}[INFO] Data statistik berhasil dikirim ke MongoDB pada [{datetime.now().strftime('%H:%M:%S')}] {RESET}")
-                print("-" * 60)
-                print("[DEBUG] Proses Chrome/Chromium aktif:")
-                for proc in get_chrome_processes():
-                    print(f"  PID={proc.info['pid']} NAME={proc.info['name']} RAM={round(proc.info['memory_info'].rss/1024/1024,2)} MB")
-                print("Menunggu 2 menit sebelum siklus berikutnya:")
+                    # Cek browser sebelum clear_cookies, context pakai try/except saja
+                    try:
+                        await context.clear_cookies()
+                    except Exception as e:
+                        print(f"[WARNING] Gagal clear_cookies: {e}")
                 # --- BATASI CPU: sleep tambahan jika CPU usage terlalu tinggi ---
                 cpu_limit = 100  # MHz
                 cpu_freq = psutil.cpu_freq().current if hasattr(psutil, 'cpu_freq') else 2600
-                # Cek CPU usage, jika >4% (dari 2.6GHz), sleep lebih lama
                 cpu_percent = psutil.cpu_percent(interval=1)
                 if cpu_percent > (cpu_limit/2600)*100:
                     print(f"[CPU] CPU usage {cpu_percent:.1f}% > batas, sleep tambahan 10 detik...")
                     await asyncio.sleep(10)
+                # Kill zombie headless_shell jika ada, tapi jangan kill browser utama
+                for proc in psutil.process_iter(['pid', 'name']):
+                    try:
+                        if proc.info['name'] and 'headless_shell' in proc.info['name'].lower() and proc.pid != os.getpid():
+                            # Jangan kill jika browser masih connected
+                            if not browser.is_connected():
+                                proc.kill()
+                    except Exception:
+                        pass
                 for i in range(1, 121):
                     print(f"\rStopwatch: {i}", end='', flush=True)
                     await asyncio.sleep(1)
@@ -462,8 +478,12 @@ async def main_loop():
         finally:
             print("\nMenutup browser...")
             try:
-                await context.close()
-                await browser.close()
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+                if browser.is_connected():
+                    await browser.close()
             except Exception:
                 pass
             print("Bot selesai.")
