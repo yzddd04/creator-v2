@@ -454,6 +454,16 @@ async def main_loop():
                         await context.clear_cookies()
                     except Exception as e:
                         print(f"[WARNING] Gagal clear_cookies: {e}")
+                # Kirim data ke MongoDB setelah semua user selesai
+                try:
+                    if stats_data:
+                        stats_collection.insert_one({
+                            'timestamp': datetime.now(timezone.utc),
+                            'data': stats_data
+                        })
+                        print(f"{YELLOW}[INFO] Data statistik berhasil dikirim ke MongoDB pada [{datetime.now().strftime('%H:%M:%S')}] {RESET}")
+                except Exception as e:
+                    print(f"[WARNING] Gagal insert ke MongoDB: {e}")
                 # --- BATASI CPU: sleep tambahan jika CPU usage terlalu tinggi ---
                 cpu_limit = 100  # MHz
                 cpu_freq = psutil.cpu_freq().current if hasattr(psutil, 'cpu_freq') else 2600
