@@ -110,20 +110,14 @@ def clear_screen():
     os.system('clear')
 
 def get_next_run_time():
-    """Hitung waktu sampai jam 7:15 pagi berikutnya"""
+    """Hitung waktu sampai 2 menit berikutnya"""
     now = datetime.now(WIB_TZ)
-    
-    # Jika sekarang sudah lewat jam 7:15 pagi, target adalah jam 7:15 pagi besok
-    if now.hour > 7 or (now.hour == 7 and now.minute >= 15):
-        target_time = now.replace(hour=7, minute=15, second=0, microsecond=0) + timedelta(days=1)
-    else:
-        # Jika sekarang masih sebelum jam 7:15 pagi, target adalah jam 7:15 pagi hari ini
-        target_time = now.replace(hour=7, minute=15, second=0, microsecond=0)
-    
+    # Target adalah 2 menit dari sekarang
+    target_time = now + timedelta(minutes=2)
     return target_time
 
 def get_time_until_next_run():
-    """Hitung berapa lama lagi sampai jam 7:15 pagi berikutnya"""
+    """Hitung berapa lama lagi sampai 2 menit berikutnya"""
     next_run = get_next_run_time()
     now = datetime.now(WIB_TZ)
     time_diff = next_run - now
@@ -143,7 +137,7 @@ def print_header():
     print(f"{BOLD}{CYAN}{'='*70}{RESET}")
     print(f"{BOLD}{MAGENTA}🤖 CREATOR WEB MONITORING BOT 🤖{RESET}")
     print(f"{BOLD}{CYAN}{'='*70}{RESET}")
-    print(f"{INFO} {BLUE}Daily Instagram & TikTok Followers Monitor (7:15 AM WIB){RESET}")
+    print(f"{INFO} {BLUE}Instagram & TikTok Followers Monitor (Every 2 Minutes){RESET}")
     print(f"{CLOCK} {BLUE}Current Time (WIB): {now.strftime('%Y-%m-%d %H:%M:%S')}{RESET}")
     print(f"{SUN} {BLUE}Next Run: {next_run.strftime('%Y-%m-%d %H:%M:%S')} WIB{RESET}")
     print(f"{STAR} {BLUE}Time Until Next Run: {hours:02d}:{minutes:02d}:{seconds:02d}{RESET}")
@@ -159,7 +153,7 @@ def print_header():
     
     # Cek status monitoring hari ini
     today = datetime.now(WIB_TZ).strftime('%Y-%m-%d')
-    today_stats = list(stats_collection.find({'date': today, 'cycle_type': 'daily'}))
+    today_stats = list(stats_collection.find({'date': today, 'cycle_type': '2min'}))
     if len(today_stats) == 0:
         print(f"{INFO} {BLUE}Today's Status: No monitoring sessions yet{RESET}")
     else:
@@ -214,7 +208,7 @@ def print_cycle_summary(success, fail, total, cycle_time):
     print(f"{BOLD}{MAGENTA}{'='*70}{RESET}")
 
 def print_countdown():
-    """Print countdown yang modern sampai jam 7:15 pagi berikutnya"""
+    """Print countdown yang modern sampai 2 menit berikutnya"""
     target_time = get_next_run_time()
     
     while True:
@@ -240,7 +234,7 @@ def print_countdown():
         time.sleep(1)
 
 async def print_countdown_async():
-    """Print countdown yang modern sampai jam 7:15 pagi berikutnya (async version)"""
+    """Print countdown yang modern sampai 2 menit berikutnya (async version)"""
     target_time = get_next_run_time()
     
     while True:
@@ -457,37 +451,37 @@ async def main_loop():
     }
     
     print(f"{SUN} {BOLD}{GREEN}Bot started successfully!{RESET}")
-    print(f"{INFO} {BLUE}Bot will run automatically every day at 7:15 AM WIB{RESET}")
+    print(f"{INFO} {BLUE}Bot will run automatically every 2 minutes{RESET}")
     
     async with async_playwright() as p:
         try:
             while True:
-                # Cek apakah sudah waktunya untuk monitoring (jam 7:15 pagi)
+                # Cek apakah sudah waktunya untuk monitoring (setiap 2 menit)
                 now = datetime.now(WIB_TZ)
                 next_run = get_next_run_time()
                 
-                # Jika belum jam 7:15 pagi, tunggu dulu
+                # Jika belum waktunya, tunggu dulu
                 if now < next_run:
                     clear_screen()
                     print_header()
-                    print(f"\n{MOON} {BOLD}{BLUE}Waiting until 7:15 AM WIB for daily monitoring...{RESET}")
+                    print(f"\n{MOON} {BOLD}{BLUE}Waiting until next 2-minute cycle...{RESET}")
                     print(f"{INFO} {BLUE}Current time: {now.strftime('%H:%M:%S')} WIB{RESET}")
                     print(f"{SUN} {BLUE}Next monitoring at: {next_run.strftime('%H:%M:%S')} WIB{RESET}")
                     
-                                    # Tunggu sampai jam 7:15 pagi
-                await print_countdown_async()
+                    # Tunggu sampai 2 menit berikutnya
+                    await print_countdown_async()
                 
                 # Mulai monitoring cycle
                 clear_screen()
                 print_header()
                 now = datetime.now(WIB_TZ)
-                print(f"\n{ROCKET} {BOLD}{CYAN}Starting daily monitoring cycle...{RESET}")
-                print(f"{CLOCK} {BLUE}Daily cycle started at: {now.strftime('%H:%M:%S')} WIB{RESET}")
+                print(f"\n{ROCKET} {BOLD}{CYAN}Starting 2-minute monitoring cycle...{RESET}")
+                print(f"{CLOCK} {BLUE}2-minute cycle started at: {now.strftime('%H:%M:%S')} WIB{RESET}")
                 print(f"{INFO} {BLUE}Monitoring Date: {now.strftime('%A, %d %B %Y')}{RESET}")
                 
                 # Cek apakah ini monitoring pertama hari ini
                 today = datetime.now(WIB_TZ).strftime('%Y-%m-%d')
-                today_stats = list(stats_collection.find({'date': today, 'cycle_type': 'daily'}))
+                today_stats = list(stats_collection.find({'date': today, 'cycle_type': '2min'}))
                 if len(today_stats) == 0:
                     print(f"{STAR} {BLUE}First monitoring session of the day{RESET}")
                 else:
@@ -698,12 +692,12 @@ async def main_loop():
                 stats_collection.insert_one({
                     'timestamp': datetime.now(timezone.utc),
                     'date': datetime.now(WIB_TZ).strftime('%Y-%m-%d'),
-                    'cycle_type': 'daily',
+                    'cycle_type': '2min',
                     'monitoring_count': monitoring_count,
                     'data': stats_data
                 })
-                print(f"{CHECK_MARK} {GREEN}Statistics sent to MongoDB (Daily monitoring #{monitoring_count}){RESET}")
-                print(f"{INFO} {BLUE}Total daily monitoring sessions today: {monitoring_count}{RESET}")
+                print(f"{CHECK_MARK} {GREEN}Statistics sent to MongoDB (2-minute monitoring #{monitoring_count}){RESET}")
+                print(f"{INFO} {BLUE}Total 2-minute monitoring sessions today: {monitoring_count}{RESET}")
                 print(f"{CYAN}{'─'*70}{RESET}")
                 print(f"{COMPUTER} {BLUE}Active Chrome processes:{RESET}")
                 for proc in get_chrome_processes():
@@ -718,14 +712,14 @@ async def main_loop():
                 if hours_until_next >= 24:
                     days_until_next = hours_until_next // 24
                     remaining_hours = hours_until_next % 24
-                    print(f"{CLOCK} {BLUE}Next daily monitoring in: {days_until_next} days, {remaining_hours} hours, {minutes_until_next} minutes{RESET}")
+                    print(f"{CLOCK} {BLUE}Next 2-minute monitoring in: {days_until_next} days, {remaining_hours} hours, {minutes_until_next} minutes{RESET}")
                 else:
-                    print(f"{CLOCK} {BLUE}Next daily monitoring in: {hours_until_next} hours, {minutes_until_next} minutes{RESET}")
+                    print(f"{CLOCK} {BLUE}Next 2-minute monitoring in: {hours_until_next} hours, {minutes_until_next} minutes{RESET}")
                 
-                print(f"\n{SUN} {GREEN}Daily monitoring cycle completed successfully!{RESET}")
+                print(f"\n{SUN} {GREEN}2-minute monitoring cycle completed successfully!{RESET}")
                 print(f"{CHECK_MARK} {GREEN}Today's monitoring session #{monitoring_count} finished{RESET}")
                 print(f"{INFO} {BLUE}Total monitoring sessions today: {monitoring_count}{RESET}")
-                print(f"{MOON} {BLUE}Bot will sleep until next run (7:15 AM WIB daily){RESET}")
+                print(f"{MOON} {BLUE}Bot will sleep until next run (every 2 minutes){RESET}")
                 
                 # Tampilkan informasi next run
                 next_run = get_next_run_time()
@@ -744,11 +738,11 @@ async def main_loop():
                     print(f"{CLOCK} {BLUE}Sleep duration: {total_hours} hours, {total_minutes} minutes{RESET}")
                 
                 if days_until_next == 0:
-                    print(f"{INFO} {BLUE}Next monitoring: Today at 7:15 AM WIB (if not already done){RESET}")
+                    print(f"{INFO} {BLUE}Next monitoring: In 2 minutes{RESET}")
                 elif days_until_next == 1:
-                    print(f"{INFO} {BLUE}Next monitoring: Tomorrow at 7:15 AM WIB{RESET}")
+                    print(f"{INFO} {BLUE}Next monitoring: Tomorrow{RESET}")
                 else:
-                    print(f"{INFO} {BLUE}Next monitoring: In {days_until_next} days at 7:15 AM WIB{RESET}")
+                    print(f"{INFO} {BLUE}Next monitoring: In {days_until_next} days{RESET}")
                 
                 # Tampilkan status monitoring hari ini
                 if monitoring_count == 1:
@@ -757,7 +751,7 @@ async def main_loop():
                     print(f"{INFO} {BLUE}Status: Monitoring session #{monitoring_count} of the day completed{RESET}")
                 
                 print(f"{CYAN}{'─'*70}{RESET}")
-                print(f"{INFO} {BLUE}Daily monitoring cycle completed. Waiting for next cycle...{RESET}")
+                print(f"{INFO} {BLUE}2-minute monitoring cycle completed. Waiting for next cycle...{RESET}")
                 
         except KeyboardInterrupt:
             print(f"\n{WARNING} {YELLOW}Bot stopped by user.{RESET}")
